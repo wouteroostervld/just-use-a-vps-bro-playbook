@@ -42,7 +42,18 @@ llm_api_key: "sk-ant-xxx"
 messaging_provider: "telegram"
 messaging_token: "123456:ABC-DEF"
 ```
+
+## 🚀 Infrastructure
+
+To run the OpenClaw Fortress with the necessary performance for agentic workflows (especially when compiling skill dependencies), we recommend a DigitalOcean Droplet with at least **2 vCPUs** and **4GB RAM**.
+
+[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%201.svg)](https://www.digitalocean.com/?refcode=140cab9a88c2&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
+
+> **Bearded Pro-tip:** Using the link above helps support the ongoing development of this "Fortress" architecture.
+
 ## 🤝 Connect with the Visionary
 If this playbook saved you from buying a Mac Mini, go thank the creator of the original lore:
 * **X (Twitter):** [@kailentit](https://x.com/kailentit)
 * **YouTube:** [Kai Lentit](https://www.youtube.com/@programmersarealsohuman5909)
+
+
