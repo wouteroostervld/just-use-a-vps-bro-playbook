@@ -1,13 +1,17 @@
 # Tailscale Configuration
-tailscale_auth_key: "tskey-auth-yourkeyhere"
+tailscale_auth_key: "tskey-auth-kDpc..."
 
 # System Configuration
 new_user: "openclaw"
+new_admin: "admin"
 ssh_port: "2222"
 node_version: "22"
 
 # OpenClaw Onboarding Secrets
 llm_provider: "anthropic"
-llm_api_key: "sk-ant-xxx"
+llm_api_key: "sk-ant-api03-uMKp..."
 messaging_provider: "telegram"
-messaging_token: "123456:ABC-DEF"
+messaging_token: "856..."
+
+#breakglass public ssh access
+public_ssh_access: false

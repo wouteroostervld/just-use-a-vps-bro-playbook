@@ -4,29 +4,52 @@
   become: yes
 
   tasks:
-    - name: 1. Update and Upgrade
+    - name: Update and Upgrade
       apt:
         update_cache: yes
         upgrade: dist
 
-    - name: 2. Install essential tools
+    - name: Install essential tools
       apt:
         name: [curl, wget, ufw, fail2ban, ca-certificates, gnupg, git, unattended-upgrades]
         state: present
 
-    - name: 3. Create dedicated OpenClaw user
+    - name: Create dedicated OpenClaw user
       user:
-        name: "{{ new_user }}"
+        name: "{{ item.name }}"
         shell: /bin/bash
         create_home: yes
+        groups: "{{ item.groups }}"
+        append: yes
+        state: present
+      loop:
+        - name: "{{ new_admin }}"
+          groups: sudo
+        - name: "{{ new_user }}"
+          groups: []
 
-    - name: 4. Set up SSH Key
+    - name: Enable User Lingering
+      command: "loginctl enable-linger {{ new_user }}"
+
+    - name: "4.Adapt sudoers: Make %sudo group passwordless:" 
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^%sudo'
+        line: '%sudo ALL=(ALL:ALL) NOPASSWD: ALL'
+        validate: '/usr/sbin/visudo -cf %s'
+
+    - name: Set up SSH Key
       authorized_key:
-        user: "{{ new_user }}"
+        user: "{{ item }}"
         state: present
         key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      loop:
+        - "{{ new_admin }}"
+        - "{{ new_user }}"
 
-    - name: 5. Hardened SSH Configuration (Port 2222)
+    - name: Hardened SSH Configuration (Port 2222)
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: "{{ item.regexp }}"
@@ -37,79 +60,123 @@
         - { regexp: '^#?PasswordAuthentication ', line: "PasswordAuthentication no" }
       notify: Restart SSH
 
-    - name: 6. Firewall Elimination Diet
+    - name: Firewall Elimination Diet
       ufw:
         state: enabled
         policy: deny
+      tags: fw
 
-    - name: Allow SSH on Port 2222 (Initial)
-      ufw:
-        rule: allow
-        port: "{{ ssh_port }}"
-        proto: tcp
 
-    - name: 7. Install NodeJS from Official Repo
+    - name: Install NodeJS from Official Repo
       shell: |
         curl -fsSL https://deb.nodesource.com/setup_{{ node_version }}.x | bash -
         apt-get install -y nodejs
 
-    - name: 8. Install Tailscale
+    - name: Install Tailscale
       shell: curl -fsSL https://tailscale.com/install.sh | sh
 
     - name: Authenticate Tailscale
       command: "tailscale up --authkey={{ tailscale_auth_key }}"
       ignore_errors: yes
 
-    - name: 9. Lock down SSH to Tailscale Only
+    - name: Allow tailscale ipv4 ip's
       ufw:
         rule: allow
         from_ip: 100.64.0.0/10
         port: "{{ ssh_port }}"
         proto: tcp
+      tags: fw
+
+    - name: Manage public rule for ssh on 2222 
+      ufw:
+        rule: allow
+        port: "{{ ssh_port }}"
+        proto: tcp
+        delete: "{{ not public_ssh_access | bool }}"
+      tags: fw
 
     - name: Remove Public SSH Access
       ufw:
         rule: deny
         port: "{{ ssh_port }}"
         proto: tcp
+        delete: "{{ public_ssh_access | bool }}"
+      tags: fw
 
-    - name: 10. Install OpenClaw via Curl
+    - name: Install OpenClaw (Headless Mode)
       become_user: "{{ new_user }}"
       shell: |
-        curl -fsSL https://openclaw.io/install.sh | bash
+        curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-prompt --no-onboard
       args:
+        executable: /bin/bash
         creates: "/home/{{ new_user }}/.openclaw/bin/openclaw"
 
-    - name: 11. Enable User Lingering
-      command: "loginctl enable-linger {{ new_user }}"
+    - name: Get UID of {{ new_user }}
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ new_user }}"
 
-    - name: 12. Setup Auto-Updating Systemd Service
+    - name: Headless Onboarding via CLI
       become_user: "{{ new_user }}"
       shell: |
-        export PATH=$PATH:/home/{{ new_user }}/.openclaw/bin
-        openclaw gateway install
-      register: openclaw_install
-      changed_when: "'installed' in openclaw_install.stdout"
-
-    - name: 13. Headless Onboarding
-      become_user: "{{ new_user }}"
-      shell: |
-        export PATH=$PATH:/home/{{ new_user }}/.openclaw/bin
-        openclaw onboard --headless \
-          --provider {{ llm_provider }} \
-          --api-key {{ llm_api_key }} \
-          --messenger {{ messaging_provider }} \
-          --messenger-token {{ messaging_token }}
+        export PATH=$PATH:/home/{{ new_user }}/.npm-global/bin
+        # This bypasses the TUI wizard and sets the config directly
+        openclaw onboard --non-interactive \
+          --accept-risk \
+          --auth-choice apiKey \
+          --token-provider {{ llm_provider }} \
+          --anthropic-api-key {{ llm_api_key }} \
+          --install-daemon
       args:
-        creates: "/home/{{ new_user }}/.openclaw/config.json"
+        creates: "/home/{{ new_user }}/.openclaw/openclaw.json"
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ getent_passwd[new_user][1] }}"
 
-    - name: 14. Ensure OpenClaw is running
+    - name: Install Telegram Provider Plugin
       become_user: "{{ new_user }}"
-      systemd:
+      shell: |
+        export PATH=$PATH:/home/{{ new_user }}/.npm-global/bin
+        openclaw plugins enable telegram
+      args:
+        executable: /bin/bash
+        creates: "/home/{{ new_user }}/.openclaw/plugins/telegram"
+        creates: "/home/{{ new_user }}/.openclaw/channels/telegram.json"
+      tags: channel
+
+    - name: 13b. Register Telegram Channel
+      become_user: "{{ new_user }}"
+      shell: |
+        export PATH=$PATH:/home/{{ new_user }}/.npm-global/bin
+        openclaw channels add \
+          --channel telegram \
+          --token "{{ messaging_token }}" \
+          --name "FortressBot"
+      args:
+        executable: /bin/bash
+        # This prevents re-running if the channel is already configured in the JSON
+        creates: "/home/{{ new_user }}/.openclaw/channels/telegram.json"
+      tags: channel
+
+    - name: Ensure OpenClaw is running (User Scope)
+      become: true
+      become_user: "{{ new_user }}"
+      ansible.builtin.systemd:
         name: openclaw-gateway
         scope: user
-        state: restarted
+        state: started
         enabled: yes
+        daemon_reload: yes
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ getent_passwd[new_user][1] }}"
+
+
+    - name: Firewall - Allow all traffic from Tailscale interface
+      become: true
+      community.general.ufw:
+        rule: allow
+        direction: in
+        interface: tailscale0
+      tags: fw
 
   handlers:
     - name: Restart SSH
