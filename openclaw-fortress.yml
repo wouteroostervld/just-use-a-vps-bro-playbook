@@ -1,0 +1,116 @@
+---
+- name: Hardened OpenClaw VPS Deployment
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: 1. Update and Upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: 2. Install essential tools
+      apt:
+        name: [curl, wget, ufw, fail2ban, ca-certificates, gnupg, git, unattended-upgrades]
+        state: present
+
+    - name: 3. Create dedicated OpenClaw user
+      user:
+        name: "{{ new_user }}"
+        shell: /bin/bash
+        create_home: yes
+
+    - name: 4. Set up SSH Key
+      authorized_key:
+        user: "{{ new_user }}"
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: 5. Hardened SSH Configuration (Port 2222)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: '^#?Port ', line: "Port {{ ssh_port }}" }
+        - { regexp: '^#?PermitRootLogin ', line: "PermitRootLogin no" }
+        - { regexp: '^#?PasswordAuthentication ', line: "PasswordAuthentication no" }
+      notify: Restart SSH
+
+    - name: 6. Firewall Elimination Diet
+      ufw:
+        state: enabled
+        policy: deny
+
+    - name: Allow SSH on Port 2222 (Initial)
+      ufw:
+        rule: allow
+        port: "{{ ssh_port }}"
+        proto: tcp
+
+    - name: 7. Install NodeJS from Official Repo
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_version }}.x | bash -
+        apt-get install -y nodejs
+
+    - name: 8. Install Tailscale
+      shell: curl -fsSL https://tailscale.com/install.sh | sh
+
+    - name: Authenticate Tailscale
+      command: "tailscale up --authkey={{ tailscale_auth_key }}"
+      ignore_errors: yes
+
+    - name: 9. Lock down SSH to Tailscale Only
+      ufw:
+        rule: allow
+        from_ip: 100.64.0.0/10
+        port: "{{ ssh_port }}"
+        proto: tcp
+
+    - name: Remove Public SSH Access
+      ufw:
+        rule: deny
+        port: "{{ ssh_port }}"
+        proto: tcp
+
+    - name: 10. Install OpenClaw via Curl
+      become_user: "{{ new_user }}"
+      shell: |
+        curl -fsSL https://openclaw.io/install.sh | bash
+      args:
+        creates: "/home/{{ new_user }}/.openclaw/bin/openclaw"
+
+    - name: 11. Enable User Lingering
+      command: "loginctl enable-linger {{ new_user }}"
+
+    - name: 12. Setup Auto-Updating Systemd Service
+      become_user: "{{ new_user }}"
+      shell: |
+        export PATH=$PATH:/home/{{ new_user }}/.openclaw/bin
+        openclaw gateway install
+      register: openclaw_install
+      changed_when: "'installed' in openclaw_install.stdout"
+
+    - name: 13. Headless Onboarding
+      become_user: "{{ new_user }}"
+      shell: |
+        export PATH=$PATH:/home/{{ new_user }}/.openclaw/bin
+        openclaw onboard --headless \
+          --provider {{ llm_provider }} \
+          --api-key {{ llm_api_key }} \
+          --messenger {{ messaging_provider }} \
+          --messenger-token {{ messaging_token }}
+      args:
+        creates: "/home/{{ new_user }}/.openclaw/config.json"
+
+    - name: 14. Ensure OpenClaw is running
+      become_user: "{{ new_user }}"
+      systemd:
+        name: openclaw-gateway
+        scope: user
+        state: restarted
+        enabled: yes
+
+  handlers:
+    - name: Restart SSH
+      service: name=ssh state=restarted
