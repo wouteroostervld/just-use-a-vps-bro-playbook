@@ -21,7 +21,8 @@ This playbook doesn't just install software; it creates a ghost in the machine:
 * **The Wormhole:** Access is only possible via a **Tailscale** private mesh.
 * **User Isolation:** OpenClaw runs as a restricted `openclaw` user, installed via `curl` into `~/.openclaw`.
 * **Self-Updating:** Because it's a user-scoped install, the bot can update its own binaries without `sudo`.
-* **Persistence:** Managed by `systemd` (the 2015 debate winner) with user-lingering enabled.
+* **Persistence:** systemd user service with lingering — OpenClaw survives reboots without root.
+* **OS-Level Isolation for AI Agents:** Landlock sandbox — kernel‑enforced playpen: read home, exec trusted bins, write only data dirs, block non‑Tailscale egress. Think “agent in a playpen.” (new untested feature)
 
 ---
 
