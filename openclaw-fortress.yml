@@ -65,7 +65,7 @@
     - name: Enable User Lingering
       command: "loginctl enable-linger {{ new_user }}"
 
-    - name: "4.Adapt sudoers: Make %sudo group passwordless:" 
+    - name: "Adapt sudoers: Make %sudo group passwordless:" 
       become: true
       ansible.builtin.lineinfile:
         path: /etc/sudoers
@@ -99,7 +99,6 @@
         state: enabled
         policy: deny
       tags: fw
-
 
     - name: Install NodeJS from Official Repo
       shell: |
@@ -177,7 +176,7 @@
         creates: "/home/{{ new_user }}/.openclaw/plugins/telegram"
       tags: channel
 
-    - name: 13b. Register Telegram Channel
+    - name: Register Telegram Channel
       become_user: "{{ new_user }}"
       shell: |
         export PATH=$PATH:/home/{{ new_user }}/.npm-global/bin
