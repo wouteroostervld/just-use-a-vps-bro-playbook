@@ -149,6 +149,7 @@
       ansible.builtin.getent:
         database: passwd
         key: "{{ new_user }}"
+      tags: nono
 
     - name: Headless Onboarding via CLI
       become_user: "{{ new_user }}"
@@ -190,6 +191,79 @@
         creates: "/home/{{ new_user }}/.openclaw/channels/telegram.json"
       tags: channel
 
+    - name: Create tempdir
+      when: 'use_nono | bool'
+      tempfile:
+       state: directory
+      register: tempdir
+      tags: nono
+
+    - name: Download nono
+      when: 'use_nono | bool'
+      get_url:
+        url: "{{ nono_distro.url }}"
+        checksum: "{{ nono_distro.hash }}"
+        dest: "{{ tempdir.path }}/nono-{{ nono_distro.hash[-6:] }}.tgz"
+        force: false
+      tags: nono
+
+    - name: Unarchive nono
+      when: 'use_nono | bool'
+      unarchive:
+        src: "{{ tempdir.path }}/nono-{{ nono_distro.hash[-6:] }}.tgz"
+        dest: "{{ tempdir.path }}"
+        remote_src: true
+      tags: nono
+
+    - name: Install nono
+      when: 'use_nono | bool'
+      copy:
+        remote_src: true
+        src: "{{ tempdir.path }}/nono"
+        dest: "/usr/local/bin/nono-{{ nono_distro.hash[-6:] }}"
+        mode: '755'
+        force: false
+      tags: nono
+
+    - name: Create symlink nono
+      when: 'use_nono | bool'
+      file:
+        state: link
+        src: "/usr/local/bin/nono-{{ nono_distro.hash[-6:] }}"
+        dest: "/usr/local/bin/nono"
+        force: true
+      tags: nono
+
+    - name: Remove tempdir
+      when: 'use_nono | bool'
+      file:
+        path: "{{ tempdir.path }}"
+        state: absent
+      tags: nono
+
+    - name: Override unitfile
+      when: 'use_nono | bool'
+      copy:
+        src: override.conf
+        dest: /home/openclaw/.config/systemd/user/openclaw-gateway.service.d/
+        mode: '644'
+        owner: openclaw
+        group: openclaw
+      tags: nono
+
+    - name: Revert unitfile override
+      when: 'not use_nono | bool'
+      become_user: "{{ new_user }}"
+      command:
+        argv:
+          - systemctl
+          - '--user'
+          - revert
+          - openclaw-gateway
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ getent_passwd[new_user][1] }}"
+      tags: nono
+
     - name: Ensure OpenClaw is running (User Scope)
       become: true
       become_user: "{{ new_user }}"
@@ -201,7 +275,7 @@
         daemon_reload: yes
       environment:
         XDG_RUNTIME_DIR: "/run/user/{{ getent_passwd[new_user][1] }}"
-
+      tags: nono
 
     - name: Firewall - Allow all traffic from Tailscale interface
       become: true

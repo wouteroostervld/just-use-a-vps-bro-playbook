@@ -18,3 +18,9 @@ messaging_token: "856..."
 
 #breakglass public ssh access
 public_ssh_access: false
+
+nono_distro:
+  url: 'https://github.com/lukehinds/nono/releases/download/v0.2.7/nono-v0.2.7-x86_64-unknown-linux-gnu.tar.gz'
+  hash: 'sha256:830b9c5541570f531fb85b6cef0904712d628b50e6a7b4f7ac21478e11ce11bd'
+# Enable experimental nono support
+use_nono: false
