@@ -33,7 +33,7 @@ This playbook doesn't just install software; it creates a ghost in the machine:
 * Your API keys (Anthropic, OpenAI, or OpenRouter).
 
 ### 2. Setup Variables
-Create a `vars.yml` file (keep this safe or use `ansible-vault`):
+Adapt the `group_vars/all.yml` file (keep this safe or use `ansible-vault`):
 
 ```yaml
 tailscale_auth_key: "tskey-auth-yourkey"
