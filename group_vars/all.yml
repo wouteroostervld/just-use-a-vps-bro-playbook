@@ -1,3 +1,6 @@
+# risk appetite
+i_accept_the_risks: false
+
 # Tailscale Configuration
 tailscale_auth_key: "tskey-auth-kDpc..."
 

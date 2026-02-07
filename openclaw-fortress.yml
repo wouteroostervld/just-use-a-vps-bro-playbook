@@ -4,6 +4,33 @@
   become: yes
 
   tasks:
+    - name: Confirm that you understand and accept the risks
+      ansible.builtin.assert:
+        that:
+          - i_accept_the_risks | bool
+        fail_msg: >
+          You did NOT set i_accept_the_risks: true
+          
+          This playbook deploys an autonomous LLM agent (OpenClaw / clawdbot) with tool access 
+          (shell commands, file system, network/browser capabilities, etc.).
+          
+          LLM agents can NEVER be made perfectly secure. Real risks include:
+          - Prompt injection leading to arbitrary code execution
+          - Accidental or malicious exposure of API keys, credentials, or sensitive data
+          - Exploits through malicious plugins/skills from public hubs
+          - Configuration mistakes leading to public exposure (this has happened to many users already)
+          
+          This playbook only applies basic hardening (Tailscale-only access, non-root user, UFW lockdown, etc.).
+          It does NOT eliminate the fundamental agent risks.
+          
+          Only proceed if you fully understand these limitations and accept the risks.
+          
+          To continue, explicitly set in your vars or via extra-vars:
+            i_accept_the_risks: true
+          
+          Otherwise: cancel now and read the security warnings first 
+          (https://docs.openclaw.ai/security, community threads, etc.)
+
     - name: Update and Upgrade
       apt:
         update_cache: yes
