@@ -41,9 +41,8 @@ llm_provider: "anthropic" # or "openai", "openrouter"
 llm_api_key: "sk-ant-xxx"
 messaging_provider: "telegram"
 messaging_token: "123456:ABC-DEF"
-
+```
 ## 🤝 Connect with the Visionary
-
 If this playbook saved you from buying a Mac Mini, go thank the creator of the original lore:
 * **X (Twitter):** [@kailentit](https://x.com/kailentit)
 * **YouTube:** [Kai Lentit](https://www.youtube.com/@programmersarealsohuman5909)
