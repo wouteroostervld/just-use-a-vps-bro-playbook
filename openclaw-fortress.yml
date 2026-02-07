@@ -167,7 +167,6 @@
       args:
         executable: /bin/bash
         creates: "/home/{{ new_user }}/.openclaw/plugins/telegram"
-        creates: "/home/{{ new_user }}/.openclaw/channels/telegram.json"
       tags: channel
 
     - name: 13b. Register Telegram Channel
