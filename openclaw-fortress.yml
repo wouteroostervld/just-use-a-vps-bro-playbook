@@ -1,7 +1,8 @@
 ---
-- name: Hardened OpenClaw VPS Deployment
+- name: Check risk appetite
   hosts: all
   become: yes
+  gather_facts: no
 
   tasks:
     - name: Confirm that you understand and accept the risks
@@ -30,7 +31,13 @@
           
           Otherwise: cancel now and read the security warnings first 
           (https://docs.openclaw.ai/security, community threads, etc.)
+      delegate_to: 127.0.0.1
 
+- name: Hardened OpenClaw VPS Deployment
+  hosts: all
+  become: yes
+
+  tasks:
     - name: Update and Upgrade
       apt:
         update_cache: yes
